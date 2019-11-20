@@ -5,6 +5,7 @@
 package mat
 
 import (
+	"gonum.org/v1/gonum/blas"
 	"gonum.org/v1/gonum/blas/blas64"
 )
 
@@ -296,4 +297,22 @@ func (b *BandDense) Trace() float64 {
 		tr += rb.Data[rb.KL+i*rb.Stride]
 	}
 	return tr
+}
+
+// MulVecTo computes B⋅x or Bᵀ⋅x storing the result into dst.
+func (b *BandDense) MulVecTo(dst []float64, trans bool, x []float64) {
+	r, c := b.Dims()
+	var t blas.Transpose
+	if trans {
+		if len(dst) != c || len(x) != r {
+			panic(ErrShape)
+		}
+		t = blas.Trans
+	} else {
+		if len(dst) != r || len(x) != c {
+			panic(ErrShape)
+		}
+		t = blas.NoTrans
+	}
+	blas64.Gbmv(t, 1, b.mat, blas64.Vector{N: c, Data: x, Inc: 1}, 0, blas64.Vector{N: r, Data: dst, Inc: 1})
 }

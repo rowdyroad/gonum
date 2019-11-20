@@ -251,3 +251,12 @@ func (s *SymBandDense) Trace() float64 {
 	}
 	return tr
 }
+
+// MulVecTo computes S⋅x storing the result into dst.
+func (s *SymBandDense) MulVecTo(dst []float64, _ bool, x []float64) {
+	n := s.mat.N
+	if len(dst) != n || len(x) != n {
+		panic(ErrShape)
+	}
+	blas64.Sbmv(1, s.mat, blas64.Vector{N: n, Data: x, Inc: 1}, 0, blas64.Vector{N: n, Data: dst, Inc: 1})
+}

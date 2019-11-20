@@ -10,6 +10,8 @@ import (
 	"reflect"
 	"testing"
 
+	"golang.org/x/exp/rand"
+
 	"gonum.org/v1/gonum/blas"
 	"gonum.org/v1/gonum/blas/blas64"
 	"gonum.org/v1/gonum/floats"
@@ -690,6 +692,72 @@ func TestDoer(t *testing.T) {
 		}
 		if got != want {
 			t.Errorf("unexpected ColDoer sum: got:%f want:%f", got, want)
+		}
+	}
+}
+
+func TestMulVecTo(t *testing.T) {
+	const tol = 1e-15
+	type MulVecToer interface {
+		Matrix
+		MulVecTo(dst []float64, trans bool, x []float64)
+	}
+	rnd := rand.New(rand.NewSource(1))
+	random := func(n int) []float64 {
+		d := make([]float64, n)
+		for i := range d {
+			d[i] = rnd.NormFloat64()
+		}
+		return d
+	}
+	for _, a := range []MulVecToer{
+		NewBandDense(1, 1, 0, 0, random(1)),
+		NewBandDense(3, 1, 0, 0, random(1)),
+		NewBandDense(3, 1, 1, 0, random(4)),
+		NewBandDense(1, 3, 0, 0, random(1)),
+		NewBandDense(1, 3, 0, 1, random(2)),
+		NewBandDense(7, 10, 0, 0, random(7)),
+		NewBandDense(7, 10, 2, 3, random(42)),
+		NewBandDense(10, 7, 0, 0, random(7)),
+		NewBandDense(10, 7, 2, 3, random(54)),
+		NewBandDense(10, 10, 0, 0, random(10)),
+		NewBandDense(10, 10, 2, 3, random(60)),
+		NewSymBandDense(1, 0, random(1)),
+		NewSymBandDense(3, 0, random(3)),
+		NewSymBandDense(3, 1, random(6)),
+		NewSymBandDense(10, 0, random(10)),
+		NewSymBandDense(10, 1, random(20)),
+		NewSymBandDense(10, 4, random(50)),
+	} {
+		var aDense Dense
+		aDense.CloneFrom(a)
+
+		r, c := a.Dims()
+
+		for _, trans := range []bool{false, true} {
+			m, n := r, c
+			if trans {
+				m, n = c, r
+			}
+
+			x := random(n)
+			xVec := NewVecDense(n, x)
+
+			want := make([]float64, m)
+			wantVec := NewVecDense(m, want)
+			if trans {
+				wantVec.MulVec(aDense.T(), xVec)
+			} else {
+				wantVec.MulVec(&aDense, xVec)
+			}
+
+			got := make([]float64, m)
+			a.MulVecTo(got, trans, x)
+
+			diff := floats.Distance(got, want, math.Inf(1))
+			if diff > tol {
+				t.Errorf("r=%v,c=%v,trans=%v: unexpected result; diff=%v", r, c, trans, diff)
+			}
 		}
 	}
 }
