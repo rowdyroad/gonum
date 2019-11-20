@@ -755,7 +755,7 @@ func TestMulVecTo(t *testing.T) {
 			a.MulVecTo(got, trans, x)
 
 			diff := floats.Distance(got, want, math.Inf(1))
-			if diff > tol {
+			if diff > tol*float64(n) {
 				t.Errorf("r=%v,c=%v,trans=%v: unexpected result; diff=%v", r, c, trans, diff)
 			}
 		}
