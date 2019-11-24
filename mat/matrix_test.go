@@ -399,6 +399,18 @@ func (v *basicVector) Len() int {
 	return len(v.m)
 }
 
+type rawVector struct {
+	basicVector
+}
+
+func (v *rawVector) RawVector() blas64.Vector {
+	return blas64.Vector{
+		N:    v.Len(),
+		Data: v.basicVector.m,
+		Inc:  1,
+	}
+}
+
 func TestDot(t *testing.T) {
 	f := func(a, b Matrix) interface{} {
 		return Dot(a.(Vector), b.(Vector))
@@ -700,7 +712,7 @@ func TestMulVecTo(t *testing.T) {
 	const tol = 1e-15
 	type MulVecToer interface {
 		Matrix
-		MulVecTo(dst []float64, trans bool, x []float64)
+		MulVecTo(dst *VecDense, trans bool, x Vector)
 	}
 	rnd := rand.New(rand.NewSource(1))
 	random := func(n int) []float64 {
@@ -740,23 +752,41 @@ func TestMulVecTo(t *testing.T) {
 				m, n = c, r
 			}
 
-			x := random(n)
-			xVec := NewVecDense(n, x)
+			for xType := 0; xType < 4; xType++ {
+				var x Vector
+				var got *VecDense
+				switch xType {
+				case 0:
+					got = &VecDense{}
+					x = NewVecDense(n, random(n))
+				case 1:
+					got = NewVecDense(m, random(m))
+					if m == n {
+						x = got
+					} else {
+						x = NewVecDense(n, random(n))
+					}
+				case 2:
+					got = &VecDense{}
+					x = &rawVector{basicVector{random(n)}}
+				case 3:
+					got = &VecDense{}
+					x = &basicVector{random(n)}
+				}
 
-			want := make([]float64, m)
-			wantVec := NewVecDense(m, want)
-			if trans {
-				wantVec.MulVec(aDense.T(), xVec)
-			} else {
-				wantVec.MulVec(&aDense, xVec)
-			}
+				want := NewVecDense(m, nil)
+				if !trans {
+					want.MulVec(&aDense, x)
+				} else {
+					want.MulVec(aDense.T(), x)
+				}
 
-			got := make([]float64, m)
-			a.MulVecTo(got, trans, x)
+				a.MulVecTo(got, trans, x)
 
-			diff := floats.Distance(got, want, math.Inf(1))
-			if diff > tol*float64(n) {
-				t.Errorf("r=%v,c=%v,trans=%v: unexpected result; diff=%v", r, c, trans, diff)
+				diff := distanceLInf(got, want)
+				if diff > tol*float64(n) {
+					t.Errorf("r=%v,c=%v,trans=%v: unexpected result; diff=%v", r, c, trans, diff)
+				}
 			}
 		}
 	}

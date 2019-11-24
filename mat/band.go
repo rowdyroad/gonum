@@ -300,19 +300,34 @@ func (b *BandDense) Trace() float64 {
 }
 
 // MulVecTo computes B⋅x or Bᵀ⋅x storing the result into dst.
-func (b *BandDense) MulVecTo(dst []float64, trans bool, x []float64) {
+func (b *BandDense) MulVecTo(dst *VecDense, trans bool, x Vector) {
 	r, c := b.Dims()
-	var t blas.Transpose
+	m, n := r, c
 	if trans {
-		if len(dst) != c || len(x) != r {
-			panic(ErrShape)
-		}
-		t = blas.Trans
-	} else {
-		if len(dst) != r || len(x) != c {
-			panic(ErrShape)
-		}
-		t = blas.NoTrans
+		m, n = c, r
 	}
-	blas64.Gbmv(t, 1, b.mat, blas64.Vector{N: c, Data: x, Inc: 1}, 0, blas64.Vector{N: r, Data: dst, Inc: 1})
+	if x.Len() != n {
+		panic(ErrShape)
+	}
+	dst.reuseAsNonZeroed(m)
+	t := blas.NoTrans
+	if trans {
+		t = blas.Trans
+	}
+	switch x := x.(type) {
+	case *VecDense:
+		if x != dst {
+			blas64.Gbmv(t, 1, b.mat, x.mat, 0, dst.mat)
+		} else {
+			var xCopy VecDense
+			xCopy.CloneVec(x)
+			blas64.Gbmv(t, 1, b.mat, xCopy.mat, 0, dst.mat)
+		}
+	case RawVectorer:
+		blas64.Gbmv(t, 1, b.mat, x.RawVector(), 0, dst.mat)
+	default:
+		var xCopy VecDense
+		xCopy.CloneVec(x)
+		blas64.Gbmv(t, 1, b.mat, xCopy.mat, 0, dst.mat)
+	}
 }

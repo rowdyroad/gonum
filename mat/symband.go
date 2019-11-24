@@ -253,10 +253,26 @@ func (s *SymBandDense) Trace() float64 {
 }
 
 // MulVecTo computes S⋅x storing the result into dst.
-func (s *SymBandDense) MulVecTo(dst []float64, _ bool, x []float64) {
+func (s *SymBandDense) MulVecTo(dst *VecDense, _ bool, x Vector) {
 	n := s.mat.N
-	if len(dst) != n || len(x) != n {
+	if x.Len() != n {
 		panic(ErrShape)
 	}
-	blas64.Sbmv(1, s.mat, blas64.Vector{N: n, Data: x, Inc: 1}, 0, blas64.Vector{N: n, Data: dst, Inc: 1})
+	dst.reuseAsNonZeroed(n)
+	switch x := x.(type) {
+	case *VecDense:
+		if dst != x {
+			blas64.Sbmv(1, s.mat, x.mat, 0, dst.mat)
+		} else {
+			var xCopy VecDense
+			xCopy.CloneVec(x)
+			blas64.Sbmv(1, s.mat, xCopy.mat, 0, dst.mat)
+		}
+	case RawVectorer:
+		blas64.Sbmv(1, s.mat, x.RawVector(), 0, dst.mat)
+	default:
+		var xCopy VecDense
+		xCopy.CloneVec(x)
+		blas64.Sbmv(1, s.mat, xCopy.mat, 0, dst.mat)
+	}
 }

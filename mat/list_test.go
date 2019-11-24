@@ -766,6 +766,24 @@ func equalDiagonal(a, b Matrix) bool {
 	return true
 }
 
+func distanceLInf(a, b Matrix) float64 {
+	ar, ac := a.Dims()
+	br, bc := b.Dims()
+	if ar != br || ac != bc {
+		panic("mismatched matrix shape")
+	}
+	var d float64
+	for i := 0; i < ar; i++ {
+		for j := 0; j < ac; j++ {
+			absDiff := math.Abs(a.At(i, j) - b.At(i, j))
+			if absDiff > d {
+				d = absDiff
+			}
+		}
+	}
+	return d
+}
+
 // underlyingData extracts the underlying data of the matrix a.
 func underlyingData(a Matrix) []float64 {
 	switch t := a.(type) {
