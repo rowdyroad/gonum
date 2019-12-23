@@ -259,20 +259,21 @@ func (s *SymBandDense) MulVecTo(dst *VecDense, _ bool, x Vector) {
 		panic(ErrShape)
 	}
 	dst.reuseAsNonZeroed(n)
-	switch x := x.(type) {
-	case *VecDense:
-		if dst != x {
-			blas64.Sbmv(1, s.mat, x.mat, 0, dst.mat)
+
+	xU, _ := untransposeExtract(x)
+	if xU, ok := xU.(*VecDense); ok {
+		if dst != xU {
+			dst.checkOverlap(xU.mat)
+			blas64.Sbmv(1, s.mat, xU.mat, 0, dst.mat)
 		} else {
 			var xCopy VecDense
-			xCopy.CloneVec(x)
+			xCopy.CloneVec(xU)
 			blas64.Sbmv(1, s.mat, xCopy.mat, 0, dst.mat)
 		}
-	case RawVectorer:
-		blas64.Sbmv(1, s.mat, x.RawVector(), 0, dst.mat)
-	default:
-		var xCopy VecDense
-		xCopy.CloneVec(x)
-		blas64.Sbmv(1, s.mat, xCopy.mat, 0, dst.mat)
+		return
 	}
+
+	var xCopy VecDense
+	xCopy.CloneVec(x)
+	blas64.Sbmv(1, s.mat, xCopy.mat, 0, dst.mat)
 }
