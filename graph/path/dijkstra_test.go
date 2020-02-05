@@ -13,7 +13,6 @@ import (
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/internal/ordered"
 	"gonum.org/v1/gonum/graph/path/internal/testgraphs"
-	"gonum.org/v1/gonum/graph/simple"
 	"gonum.org/v1/gonum/graph/traverse"
 )
 
@@ -118,6 +117,7 @@ func TestDijkstraAllPaths(t *testing.T) {
 			}()
 			pt = DijkstraAllPaths(g.(graph.Graph))
 		}()
+
 		if panicked || test.HasNegativeWeight {
 			if !test.HasNegativeWeight {
 				t.Errorf("%q: unexpected panic", test.Name)
@@ -196,33 +196,106 @@ func TestDijkstraAllPaths(t *testing.T) {
 	}
 }
 
-func TestAllShortestAbsentNode(t *testing.T) {
-	g := simple.NewUndirectedGraph()
-	g.SetEdge(simple.Edge{F: simple.Node(1), T: simple.Node(2)})
-	paths := DijkstraAllPaths(g)
-	// Confirm we have a good paths tree.
-	if _, cost := paths.AllBetween(1, 2); cost != 1 {
-		t.Errorf("unexpected cost between existing nodes: got:%v want:1", cost)
-	}
+func TestDijkstraAllPathsEncodeDecode(t *testing.T) {
+	for _, test := range testgraphs.ShortestPathTests {
+		g := test.Graph()
+		for _, e := range test.Edges {
+			g.SetWeightedEdge(e)
+		}
 
-	gotPath, cost, unique := paths.Between(0, 0)
-	if cost != 0 {
-		t.Errorf("unexpected cost from absent node to itself: got:%v want:0", cost)
-	}
-	if !unique {
-		t.Error("unexpected non-unique path from absent node to itself")
-	}
-	wantPath := []graph.Node{node(0)}
-	if !reflect.DeepEqual(gotPath, wantPath) {
-		t.Errorf("unexpected path from absent node to itself: got:%#v want:%#v", gotPath, wantPath)
-	}
+		var (
+			pt AllShortest
 
-	gotPaths, cost := paths.AllBetween(0, 0)
-	if cost != 0 {
-		t.Errorf("unexpected cost from absent node to itself: got:%v want:0", cost)
-	}
-	wantPaths := [][]graph.Node{{node(0)}}
-	if !reflect.DeepEqual(gotPaths, wantPaths) {
-		t.Errorf("unexpected paths from absent node to itself: got:%#v want:%#v", gotPaths, wantPaths)
+			panicked bool
+		)
+		func() {
+			defer func() {
+				panicked = recover() != nil
+			}()
+			x := DijkstraAllPaths(g.(graph.Graph))
+			data, err := x.Encode()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := pt.Decode(data); err != nil {
+				t.Fatal(err)
+			}
+		}()
+
+		if panicked || test.HasNegativeWeight {
+			if !test.HasNegativeWeight {
+				t.Errorf("%q: unexpected panic", test.Name)
+			}
+			if !panicked {
+				t.Errorf("%q: expected panic for negative edge weight", test.Name)
+			}
+			continue
+		}
+
+		// Check all random paths returned are OK.
+		for i := 0; i < 10; i++ {
+			p, weight, unique := pt.Between(test.Query.From().ID(), test.Query.To().ID())
+			if weight != test.Weight {
+				t.Errorf("%q: unexpected weight from Between: got:%f want:%f",
+					test.Name, weight, test.Weight)
+			}
+			if weight := pt.Weight(test.Query.From().ID(), test.Query.To().ID()); weight != test.Weight {
+				t.Errorf("%q: unexpected weight from Weight: got:%f want:%f",
+					test.Name, weight, test.Weight)
+			}
+			if unique != test.HasUniquePath {
+				t.Errorf("%q: unexpected number of paths: got: unique=%t want: unique=%t",
+					test.Name, unique, test.HasUniquePath)
+			}
+
+			var got []int64
+			for _, n := range p {
+				got = append(got, n.ID())
+			}
+			ok := len(got) == 0 && len(test.WantPaths) == 0
+			for _, sp := range test.WantPaths {
+				if reflect.DeepEqual(got, sp) {
+					ok = true
+					break
+				}
+			}
+			if !ok {
+				t.Errorf("%q: unexpected shortest path:\ngot: %v\nwant from:%v",
+					test.Name, p, test.WantPaths)
+			}
+		}
+
+		np, weight, unique := pt.Between(test.NoPathFor.From().ID(), test.NoPathFor.To().ID())
+		if np != nil || !math.IsInf(weight, 1) || unique {
+			t.Errorf("%q: unexpected path:\ngot: path=%v weight=%f unique=%t\nwant:path=<nil> weight=+Inf unique=false",
+				test.Name, np, weight, unique)
+		}
+
+		paths, weight := pt.AllBetween(test.Query.From().ID(), test.Query.To().ID())
+		if weight != test.Weight {
+			t.Errorf("%q: unexpected weight from Between: got:%f want:%f",
+				test.Name, weight, test.Weight)
+		}
+
+		var got [][]int64
+		if len(paths) != 0 {
+			got = make([][]int64, len(paths))
+		}
+		for i, p := range paths {
+			for _, v := range p {
+				got[i] = append(got[i], v.ID())
+			}
+		}
+		sort.Sort(ordered.BySliceValues(got))
+		if !reflect.DeepEqual(got, test.WantPaths) {
+			t.Errorf("testing %q: unexpected shortest paths:\ngot: %v\nwant:%v",
+				test.Name, got, test.WantPaths)
+		}
+
+		nps, weight := pt.AllBetween(test.NoPathFor.From().ID(), test.NoPathFor.To().ID())
+		if nps != nil || !math.IsInf(weight, 1) {
+			t.Errorf("%q: unexpected path:\ngot: paths=%v weight=%f\nwant:path=<nil> weight=+Inf",
+				test.Name, nps, weight)
+		}
 	}
 }

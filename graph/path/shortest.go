@@ -5,6 +5,8 @@
 package path
 
 import (
+	"bytes"
+	"encoding/gob"
 	"math"
 
 	"golang.org/x/exp/rand"
@@ -13,6 +15,7 @@ import (
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/internal/ordered"
 	"gonum.org/v1/gonum/graph/internal/set"
+	"gonum.org/v1/gonum/graph/simple"
 	"gonum.org/v1/gonum/mat"
 )
 
@@ -413,3 +416,82 @@ func (p AllShortest) allBetween(from, to int, seen []bool, path []graph.Node, pa
 type node int64
 
 func (n node) ID() int64 { return int64(n) }
+
+type jsonContext struct {
+	Nodes    []int64
+	IndexOf  map[int64]int
+	Next     [][]int
+	Forward  bool
+	DistRows int
+	DistCols int
+	DistData []float64
+}
+
+func (p AllShortest) Encode() ([]byte, error) {
+	context := jsonContext{
+		IndexOf: p.indexOf,
+		Next:    p.next,
+		Forward: p.forward,
+		Nodes:   make([]int64, 0, len(p.nodes)),
+	}
+	if p.dist != nil {
+		data := make([]float64, 0, len(p.dist.RawMatrix().Data))
+		for _, r := range p.dist.RawMatrix().Data {
+			switch {
+			case math.IsInf(r, 1):
+				data = append(data, math.MaxFloat64)
+			case math.IsInf(r, -1):
+				data = append(data, -math.MaxFloat64)
+			default:
+				data = append(data, r)
+			}
+		}
+		context.DistRows = p.dist.RawMatrix().Rows
+		context.DistCols = p.dist.RawMatrix().Cols
+		context.DistData = data
+	}
+
+	for _, node := range p.nodes {
+		context.Nodes = append(context.Nodes, node.ID())
+	}
+	var buf bytes.Buffer
+	x := gob.NewEncoder(&buf)
+	if err := x.Encode(&context); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func (p *AllShortest) Decode(data []byte) error {
+	var context jsonContext
+
+	buf := bytes.NewBuffer(data)
+	decoder := gob.NewDecoder(buf)
+	if err := decoder.Decode(&context); err != nil {
+		return err
+	}
+
+	p.nodes = make([]graph.Node, 0, len(context.Nodes))
+	p.indexOf = context.IndexOf
+	p.forward = context.Forward
+	p.next = context.Next
+	if context.DistRows > 0 && context.DistCols > 0 {
+		distData := make([]float64, 0, len(context.DistData))
+		for _, r := range context.DistData {
+			switch r {
+			case math.MaxFloat64:
+				distData = append(distData, math.Inf(1))
+			case -math.MaxFloat64:
+				distData = append(distData, math.Inf(-1))
+			default:
+				distData = append(distData, r)
+			}
+		}
+		p.dist = mat.NewDense(context.DistRows, context.DistCols, distData)
+	}
+	for _, node := range context.Nodes {
+		p.nodes = append(p.nodes, simple.Node(node))
+	}
+
+	return nil
+}
