@@ -5,6 +5,7 @@
 package simple_test
 
 import (
+	"bytes"
 	"math"
 	"testing"
 
@@ -203,4 +204,33 @@ func TestIssue123WeightedDirectedGraph(t *testing.T) {
 
 	n2 := g.NewNode()
 	g.AddNode(n2)
+}
+
+func TestHash(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("unexpected panic: %v", r)
+		}
+	}()
+
+	g := simple.NewWeightedDirectedGraph(0, math.Inf(1))
+	for i := 0; i < 100; i++ {
+		for j := 101; j < 200; j++ {
+			g.SetWeightedEdge(simple.WeightedEdge{F: simple.Node(i), T: simple.Node(j), W: float64(i * j)})
+		}
+	}
+
+	g2 := simple.NewWeightedDirectedGraph(0, math.Inf(1))
+	for i := 0; i < 100; i++ {
+		for j := 101; j < 200; j++ {
+			g2.SetWeightedEdge(simple.WeightedEdge{F: simple.Node(i), T: simple.Node(j), W: float64(i * j)})
+		}
+	}
+
+	h1 := g.Hash()
+	h2 := g2.Hash()
+
+	if bytes.Compare(h1, h2) != 0 {
+		t.Error("Hashes is not equals")
+	}
 }

@@ -5,10 +5,8 @@
 package simple
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/gob"
-	"firebase.google.com/go/auth/hash"
 	"fmt"
 
 	"gonum.org/v1/gonum/graph"
