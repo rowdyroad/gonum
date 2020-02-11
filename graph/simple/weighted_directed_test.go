@@ -214,23 +214,35 @@ func TestHash(t *testing.T) {
 	}()
 
 	g := simple.NewWeightedDirectedGraph(0, math.Inf(1))
-	for i := 0; i < 100; i++ {
-		for j := 101; j < 200; j++ {
+	for i := 0; i < 4; i++ {
+		for j := 5; j < 10; j++ {
 			g.SetWeightedEdge(simple.WeightedEdge{F: simple.Node(i), T: simple.Node(j), W: float64(i * j)})
 		}
 	}
 
 	g2 := simple.NewWeightedDirectedGraph(0, math.Inf(1))
-	for i := 0; i < 100; i++ {
-		for j := 101; j < 200; j++ {
+	for i := 0; i < 4; i++ {
+		for j := 5; j < 10; j++ {
 			g2.SetWeightedEdge(simple.WeightedEdge{F: simple.Node(i), T: simple.Node(j), W: float64(i * j)})
+		}
+	}
+
+	g3 := simple.NewWeightedDirectedGraph(0, math.Inf(1))
+	for i := 0; i < 5; i++ {
+		for j := 6; j < 11; j++ {
+			g3.SetWeightedEdge(simple.WeightedEdge{F: simple.Node(i), T: simple.Node(j), W: float64(i * j)})
 		}
 	}
 
 	h1 := g.Hash()
 	h2 := g2.Hash()
 
-	if bytes.Compare(h1, h2) != 0 {
+	if bytes.Compare(h1[:], h2[:]) != 0 {
 		t.Error("Hashes is not equals")
+	}
+
+	h3 := g3.Hash()
+	if bytes.Compare(h1[:], h3[:]) == 0 {
+		t.Error("Hashes is  equals")
 	}
 }

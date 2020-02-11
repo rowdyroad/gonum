@@ -8,10 +8,10 @@ import (
 	"crypto/sha256"
 	"encoding/gob"
 	"fmt"
-
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/internal/uid"
 	"gonum.org/v1/gonum/graph/iterator"
+	"sort"
 )
 
 var (
@@ -288,12 +288,33 @@ func (g *WeightedDirectedGraph) WeightedEdges() graph.WeightedEdges {
 
 func (g *WeightedDirectedGraph) Hash() []byte {
 	hash := sha256.New()
+	type node struct {
+		From   int64
+		To     int64
+		Weight float64
+	}
 	enc := gob.NewEncoder(hash)
-	enc.Encode(g.nodes)
-	enc.Encode(g.from)
-	enc.Encode(g.to)
-	enc.Encode(g.self)
-	enc.Encode(g.absent)
+	nodes := []node{}
+	for _, nn := range g.from {
+		for _, e := range nn {
+			nodes = append(nodes, node{
+				From:   e.From().ID(),
+				To:     e.To().ID(),
+				Weight: e.Weight(),
+			})
+		}
+	}
+
+	sort.Slice(nodes, func(i, j int) bool {
+		if nodes[i].From == nodes[j].From {
+			return nodes[i].To < nodes[j].To
+		}
+		return nodes[i].From < nodes[j].From
+	})
+
+	if err := enc.Encode(nodes); err != nil {
+		panic(err)
+	}
 
 	return hash.Sum(nil)[:]
 }
