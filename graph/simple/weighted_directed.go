@@ -5,6 +5,10 @@
 package simple
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/gob"
+	"firebase.google.com/go/auth/hash"
 	"fmt"
 
 	"gonum.org/v1/gonum/graph"
@@ -282,4 +286,16 @@ func (g *WeightedDirectedGraph) WeightedEdges() graph.WeightedEdges {
 		return graph.Empty
 	}
 	return iterator.NewOrderedWeightedEdges(edges)
+}
+
+func (g *WeightedDirectedGraph) Hash() []byte {
+	hash := sha256.New()
+	enc := gob.NewEncoder(hash)
+	enc.Encode(g.nodes)
+	enc.Encode(g.from)
+	enc.Encode(g.to)
+	enc.Encode(g.self)
+	enc.Encode(g.absent)
+
+	return hash.Sum(nil)[:]
 }

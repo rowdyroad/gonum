@@ -435,20 +435,9 @@ func (p AllShortest) Encode() ([]byte, error) {
 		Nodes:   make([]int64, 0, len(p.nodes)),
 	}
 	if p.dist != nil {
-		data := make([]float64, 0, len(p.dist.RawMatrix().Data))
-		for _, r := range p.dist.RawMatrix().Data {
-			switch {
-			case math.IsInf(r, 1):
-				data = append(data, math.MaxFloat64)
-			case math.IsInf(r, -1):
-				data = append(data, -math.MaxFloat64)
-			default:
-				data = append(data, r)
-			}
-		}
 		context.DistRows = p.dist.RawMatrix().Rows
 		context.DistCols = p.dist.RawMatrix().Cols
-		context.DistData = data
+		context.DistData = p.dist.RawMatrix().Data
 	}
 
 	for _, node := range p.nodes {
@@ -476,18 +465,7 @@ func (p *AllShortest) Decode(data []byte) error {
 	p.forward = context.Forward
 	p.next = context.Next
 	if context.DistRows > 0 && context.DistCols > 0 {
-		distData := make([]float64, 0, len(context.DistData))
-		for _, r := range context.DistData {
-			switch r {
-			case math.MaxFloat64:
-				distData = append(distData, math.Inf(1))
-			case -math.MaxFloat64:
-				distData = append(distData, math.Inf(-1))
-			default:
-				distData = append(distData, r)
-			}
-		}
-		p.dist = mat.NewDense(context.DistRows, context.DistCols, distData)
+		p.dist = mat.NewDense(context.DistRows, context.DistCols, context.DistData)
 	}
 	for _, node := range context.Nodes {
 		p.nodes = append(p.nodes, simple.Node(node))
