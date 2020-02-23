@@ -453,9 +453,13 @@ func (p AllShortest) Encode() ([]byte, error) {
 
 func (p *AllShortest) Decode(data []byte) error {
 	var context jsonContext
+	return p.DecodeFromReader(bytes.NewBuffer(data))
+}
 
-	buf := bytes.NewBuffer(data)
-	decoder := gob.NewDecoder(buf)
+func (p *AllShortest) DecodeFromReader(reader io.Reader) error {
+	var context jsonContext
+
+	decoder := gob.NewDecoder(reader)
 	if err := decoder.Decode(&context); err != nil {
 		return err
 	}
@@ -473,3 +477,4 @@ func (p *AllShortest) Decode(data []byte) error {
 
 	return nil
 }
+
