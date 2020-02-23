@@ -5,6 +5,8 @@
 package path
 
 import (
+	"bytes"
+	"encoding/gob"
 	"math"
 	"reflect"
 	"sort"
@@ -213,11 +215,16 @@ func TestDijkstraAllPathsEncodeDecode(t *testing.T) {
 				panicked = recover() != nil
 			}()
 			x := DijkstraAllPaths(g.(graph.Graph))
-			data, err := x.Encode()
+
+			var buf bytes.Buffer
+			enc := gob.NewEncoder(&buf)
+			err := enc.Encode(x)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := pt.Decode(data); err != nil {
+
+			dec := gob.NewDecoder(&buf)
+			if err := dec.Decode(&pt); err != nil {
 				t.Fatal(err)
 			}
 		}()

@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"encoding/gob"
 	"math"
-	"io"
 
 	"golang.org/x/exp/rand"
 
@@ -428,7 +427,7 @@ type jsonContext struct {
 	DistData []float64
 }
 
-func (p AllShortest) Encode() ([]byte, error) {
+func (p AllShortest) MarshalBinary() ([]byte, error) {
 	context := jsonContext{
 		IndexOf: p.indexOf,
 		Next:    p.next,
@@ -452,14 +451,10 @@ func (p AllShortest) Encode() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (p *AllShortest) Decode(data []byte) error {
-	return p.DecodeFromReader(bytes.NewBuffer(data))
-}
-
-func (p *AllShortest) DecodeFromReader(reader io.Reader) error {
+func (p *AllShortest) UnmarshalBinary(data []byte) error {
 	var context jsonContext
-
-	decoder := gob.NewDecoder(reader)
+	buf := bytes.NewBuffer(data)
+	decoder := gob.NewDecoder(buf)
 	if err := decoder.Decode(&context); err != nil {
 		return err
 	}
@@ -477,4 +472,3 @@ func (p *AllShortest) DecodeFromReader(reader io.Reader) error {
 
 	return nil
 }
-
