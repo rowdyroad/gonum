@@ -453,7 +453,6 @@ func (p AllShortest) Encode() ([]byte, error) {
 }
 
 func (p *AllShortest) Decode(data []byte) error {
-	var context jsonContext
 	return p.DecodeFromReader(bytes.NewBuffer(data))
 }
 
